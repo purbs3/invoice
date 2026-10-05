@@ -15,6 +15,7 @@ def get_settings():
         "address":      os.environ.get("COMPANY_ADDRESS", "Patna, Bihar"),
         "phone":        os.environ.get("COMPANY_PHONE", "+91 7644865116"),
         "registration": os.environ.get("REGISTRATION_NUMBER", "UDYAM-BR-25-0168098"),
+        "slogan":       os.environ.get("COMPANY_SLOGAN", "Care Beyond Clinic Walls"),
         "gst_rate":     int(os.environ.get("DEFAULT_GST", "0")),
     }
 
@@ -109,22 +110,31 @@ def _draw_page(c, w, h, copy_label, inv_no, patient, age, contact, diagnosis,
         except Exception:
             pass
 
+    # Company header
     c.setFont("Helvetica-Bold", 15)
-    c.drawString(54*mm, h-22*mm, s["company"])
+    c.drawString(54*mm, h-20*mm, s["company"])
+
+    c.setFont("Helvetica-Oblique", 8.5)
+    c.setFillColorRGB(0, 0.47, 0.42)
+    c.drawString(54*mm, h-25*mm, s["slogan"])
+    c.setFillColorRGB(0, 0, 0)
+
     c.setFont("Helvetica", 9)
-    c.drawString(54*mm, h-27*mm, s["address"])
-    c.drawString(54*mm, h-32*mm, f"Ph: {s['phone']}")
-    c.drawString(54*mm, h-37*mm, f"Registration No: {s['registration']}")
+    c.drawString(54*mm, h-30*mm, s["address"])
+    c.drawString(54*mm, h-35*mm, f"Ph: {s['phone']}")
+    c.drawString(54*mm, h-40*mm, f"Registration No: {s['registration']}")
 
     c.setFont("Helvetica-Bold", 10)
-    c.drawRightString(190*mm, h-22*mm, copy_label)
+    c.drawRightString(190*mm, h-20*mm, copy_label)
 
+    # Title
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(20*mm, h-50*mm, "PHYSIOTHERAPY INVOICE")
+    c.drawString(20*mm, h-52*mm, "PHYSIOTHERAPY INVOICE")
     c.setFont("Helvetica-Oblique", 8)
-    c.drawString(20*mm, h-54*mm, "Not for Government Use")
+    c.drawString(20*mm, h-56*mm, "Not for Government Use")
 
-    y = h - 65*mm
+    # Patient details
+    y = h - 67*mm
     c.setFont("Helvetica", 10)
     c.drawString(20*mm, y, f"Invoice No: {inv_no}")
     c.drawString(125*mm, y, f"Date: {inv_date}")
@@ -144,6 +154,7 @@ def _draw_page(c, w, h, copy_label, inv_no, patient, age, contact, diagnosis,
     c.drawString(20*mm, y, f"Treatment Period: {pf} to {pt}")
     y -= 10*mm
 
+    # Items
     c.setFont("Helvetica-Bold", 10)
     for x, t in [(20,"Treatment / Service"),(105,"Sessions"),(130,"Fee/Session"),(160,"Amount")]:
         c.drawString(x*mm, y, t)
@@ -171,6 +182,7 @@ def _draw_page(c, w, h, copy_label, inv_no, patient, age, contact, diagnosis,
     c.drawString(125*mm, y, f"Total: Rs {total:.2f}")
     y -= 12*mm
 
+    # Payment
     c.setFont("Helvetica-Bold", 10)
     c.drawString(20*mm, y, "Payment Details")
     y -= 6*mm
@@ -180,12 +192,20 @@ def _draw_page(c, w, h, copy_label, inv_no, patient, age, contact, diagnosis,
     c.drawString(20*mm, y, f"Payment Received On: {pay_date}")
     y -= 14*mm
 
+    # Signature
     c.setFont("Helvetica-Oblique", 9)
     c.drawString(20*mm, y, "Therapist Signature: ____________________")
 
+    # Thank you
+    c.setFont("Helvetica-BoldOblique", 9)
+    c.setFillColorRGB(0, 0.47, 0.42)
+    c.drawCentredString(w/2, 25*mm, "Thank you for trusting NPRC Global")
+    c.setFillColorRGB(0, 0, 0)
+
+    # Footer
     c.setFont("Helvetica-Oblique", 7)
-    c.drawString(20*mm, 15*mm,
-        "This is a commercial invoice and is NOT valid for government / official use.")
+    c.drawCentredString(w/2, 18*mm,
+        f"{s['slogan']}  •  This is a commercial invoice and is NOT valid for government / official use.")
 
 def build_pdf_bytes(inv_no, patient, age, contact, diagnosis, referred_by,
                     inv_date, pf, pt, pay_type, pay_date,
@@ -227,8 +247,9 @@ FORM_HTML = SVG_DEFS + """
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
  body{font-family:system-ui,Arial;max-width:680px;margin:20px auto;padding:16px;background:#f0f7f4}
- h1{color:#00796b;margin-top:0;display:flex;align-items:center;gap:8px;font-size:22px}
+ h1{color:#00796b;margin-top:0;display:flex;align-items:center;gap:8px;font-size:22px;margin-bottom:4px}
  h1 svg{flex-shrink:0}
+ .slogan{color:#00796b;font-style:italic;font-size:14px;margin:0 0 16px 0;font-weight:500;letter-spacing:.3px}
  .card{background:#fff;padding:16px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:14px}
  label{display:block;font-size:13px;color:#555;margin-top:10px}
  input,select{width:100%;padding:9px;border:1px solid #ccc;border-radius:6px;font-size:15px;box-sizing:border-box}
@@ -241,6 +262,8 @@ FORM_HTML = SVG_DEFS + """
  .top-links a{color:#00796b;font-size:14px;text-decoration:none;font-weight:500;
               display:inline-flex;align-items:center;gap:5px}
  .top-links a svg{flex-shrink:0}
+ .page-footer{text-align:center;color:#888;font-size:12px;margin-top:24px;padding-top:16px;
+              border-top:1px solid #d5e5e2;font-style:italic}
 </style></head><body>
 
 <div class="top-links">
@@ -249,6 +272,7 @@ FORM_HTML = SVG_DEFS + """
 </div>
 
 <h1>{{ icon_plus_cross(24) }} NPRC Global — Invoice</h1>
+<p class="slogan">Care Beyond Clinic Walls</p>
 
 <form method="post" action="/preview">
 
@@ -308,6 +332,8 @@ FORM_HTML = SVG_DEFS + """
 <button class="green" type="submit">{{ icon_eye(18) }} Preview Invoice</button>
 </form>
 
+<p class="page-footer">Care Beyond Clinic Walls</p>
+
 <script>
 function addRow(){
   const d=document.createElement('div'); d.className='row';
@@ -327,8 +353,9 @@ PREVIEW_HTML = SVG_DEFS + """
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
  body{font-family:system-ui,Arial;max-width:680px;margin:20px auto;padding:16px;background:#f0f7f4}
- h1{color:#00796b;margin-top:0;display:flex;align-items:center;gap:8px;font-size:22px}
+ h1{color:#00796b;margin-top:0;display:flex;align-items:center;gap:8px;font-size:22px;margin-bottom:4px}
  h1 svg{flex-shrink:0}
+ .slogan{color:#00796b;font-style:italic;font-size:14px;margin:0 0 16px 0;font-weight:500;letter-spacing:.3px}
  .warn{background:#fff3cd;color:#856404;padding:12px 14px;border-radius:8px;margin-bottom:14px;font-size:14px;display:flex;align-items:flex-start;gap:8px;line-height:1.5}
  .warn svg{flex-shrink:0;margin-top:2px}
  .card{background:#fff;padding:16px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:14px}
@@ -361,7 +388,7 @@ PREVIEW_HTML = SVG_DEFS + """
 
  @media print {
    body{background:#fff;max-width:none;margin:0;padding:0;font-size:11pt;color:#000}
-   .warn, .btns, h1, .no-print, .screen-only{display:none !important}
+   .warn, .btns, h1, .slogan, .no-print, .screen-only{display:none !important}
    .print-only{display:block !important}
    .card{box-shadow:none;border:1px solid #ccc;border-radius:0;margin-bottom:6mm;
          padding:5mm;page-break-inside:avoid}
@@ -374,10 +401,13 @@ PREVIEW_HTML = SVG_DEFS + """
    .print-header{display:block !important;margin-bottom:6mm;padding-bottom:4mm;
                  border-bottom:2px solid #00796b;text-align:center}
    .print-header h2{margin:0;color:#00796b;font-size:16pt}
+   .print-header .slogan-print{color:#00796b;font-style:italic;font-size:11pt;
+                               margin:2mm 0;font-weight:500}
    .print-header .sub{color:#555;font-size:10pt;margin-top:2px}
    .page1 { page-break-after: always; break-after: page; }
    @page{margin:15mm}
  }
+ .slogan-print{color:#00796b;font-style:italic;font-size:11pt;margin:2mm 0;font-weight:500}
 </style></head><body>
 
 {% macro invoice_body(copy_label=None) %}
@@ -433,6 +463,7 @@ PREVIEW_HTML = SVG_DEFS + """
 
 <div class="screen-only">
   <h1>{{ icon_eye(24) }} Preview Invoice</h1>
+  <p class="slogan">Care Beyond Clinic Walls</p>
 
   <div class="warn">
     {{ icon_warning(18) }}
@@ -461,6 +492,7 @@ PREVIEW_HTML = SVG_DEFS + """
 <div class="print-only page1">
   <div class="print-header">
     <h2>{{ company_name }}</h2>
+    <div class="slogan-print">{{ company_slogan }}</div>
     <div class="sub">{{ company_address }} • {{ company_phone }}</div>
     <div class="sub">Registration No: {{ company_reg }}</div>
   </div>
@@ -473,6 +505,7 @@ PREVIEW_HTML = SVG_DEFS + """
 <div class="print-only">
   <div class="print-header">
     <h2>{{ company_name }}</h2>
+    <div class="slogan-print">{{ company_slogan }}</div>
     <div class="sub">{{ company_address }} • {{ company_phone }}</div>
     <div class="sub">Registration No: {{ company_reg }}</div>
   </div>
@@ -492,8 +525,9 @@ HISTORY_HTML = SVG_DEFS + """
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
  body{font-family:system-ui,Arial;max-width:720px;margin:20px auto;padding:16px;background:#f0f7f4}
- h1{color:#00796b;display:flex;align-items:center;gap:8px;font-size:22px}
+ h1{color:#00796b;display:flex;align-items:center;gap:8px;font-size:22px;margin-bottom:4px}
  h1 svg{flex-shrink:0}
+ .slogan{color:#00796b;font-style:italic;font-size:13px;margin:0 0 12px 0;font-weight:500}
  .card{background:#fff;padding:12px 14px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:10px}
  .no{font-weight:600;color:#00796b}
  .meta{font-size:13px;color:#666;margin-top:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
@@ -504,8 +538,11 @@ HISTORY_HTML = SVG_DEFS + """
  .links a svg{flex-shrink:0}
  .empty{text-align:center;color:#999;padding:40px 0}
  .empty svg{display:block;margin:0 auto 10px;opacity:.4}
+ .page-footer{text-align:center;color:#888;font-size:12px;margin-top:24px;padding-top:16px;
+              border-top:1px solid #d5e5e2;font-style:italic}
 </style></head><body>
 <h1>{{ icon_history(22) }} Invoice History</h1>
+<p class="slogan">Care Beyond Clinic Walls</p>
 <div class="links">
   <a href="/">{{ icon_arrow_left(14) }} New Invoice</a>
   <a href="/admin">{{ icon_gear(14) }} Admin</a>
@@ -528,6 +565,7 @@ HISTORY_HTML = SVG_DEFS + """
     Abhi koi invoice nahi bana.
   </div>
 {% endif %}
+<p class="page-footer">Care Beyond Clinic Walls</p>
 </body></html>
 """
 
@@ -538,8 +576,9 @@ ADMIN_HTML = SVG_DEFS + """
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
  body{font-family:system-ui,Arial;max-width:520px;margin:20px auto;padding:16px;background:#f0f7f4}
- h1{color:#00796b;display:flex;align-items:center;gap:8px;font-size:22px}
+ h1{color:#00796b;display:flex;align-items:center;gap:8px;font-size:22px;margin-bottom:4px}
  h1 svg{flex-shrink:0}
+ .slogan{color:#00796b;font-style:italic;font-size:13px;margin:0 0 12px 0;font-weight:500}
  .card{background:#fff;padding:16px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:14px}
  label{display:block;font-size:13px;color:#555;margin-top:10px}
  input{width:100%;padding:9px;border:1px solid #ccc;border-radius:6px;font-size:15px;box-sizing:border-box}
@@ -552,8 +591,11 @@ ADMIN_HTML = SVG_DEFS + """
  .links a svg{flex-shrink:0}
  h3{display:flex;align-items:center;gap:8px;margin-top:0}
  h3 svg{flex-shrink:0}
+ .page-footer{text-align:center;color:#888;font-size:12px;margin-top:24px;padding-top:16px;
+              border-top:1px solid #d5e5e2;font-style:italic}
 </style></head><body>
 <h1>{{ icon_gear(22) }} Admin — NPRC Global</h1>
+<p class="slogan">Care Beyond Clinic Walls</p>
 <div class="links">
   <a href="/">{{ icon_arrow_left(14) }} New Invoice</a>
   <a href="/history">{{ icon_history(14) }} History</a>
@@ -584,6 +626,8 @@ ADMIN_HTML = SVG_DEFS + """
     <button class="red" type="submit">{{ icon_trash(15) }} Clear Invoice History</button>
   </form>
 </div>
+
+<p class="page-footer">Care Beyond Clinic Walls</p>
 
 </body></html>
 """
@@ -676,6 +720,7 @@ def preview():
         company_address=s["address"],
         company_phone=s["phone"],
         company_reg=s["registration"],
+        company_slogan=s["slogan"],
     )
 
 @app.route("/api/download", methods=["POST"])
