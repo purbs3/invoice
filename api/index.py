@@ -2,7 +2,7 @@ from flask import Flask, request, send_file, render_template_string, redirect, u
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
-import io, os, json
+import io, os, json, random, string
 from datetime import date, datetime
 import redis
 
@@ -19,7 +19,7 @@ def get_settings():
         "gst_rate":     int(os.environ.get("DEFAULT_GST", "0")),
     }
 
-# ==================== REDIS / KV ====================
+# ==================== REDIS / KV (history ke liye optional) ====================
 KV_URL = os.environ.get("KV_URL") or os.environ.get("REDIS_URL")
 
 def get_redis():
@@ -28,28 +28,11 @@ def get_redis():
     return redis.from_url(KV_URL, decode_responses=True)
 
 def gen_invoice_no():
-    r = get_redis()
-    year = date.today().year
-    if r is None:
-        return f"NPRC-{year}-{datetime.now().strftime('%H%M%S')}"
-    try:
-        n = r.incr(f"invoice_counter:{year}")
-        return f"NPRC-{year}-{n:04d}"
-    except Exception as e:
-        print("KV error:", e)
-        return f"NPRC-{year}-{datetime.now().strftime('%H%M%S')}"
-
-def peek_next_invoice_no():
-    r = get_redis()
-    year = date.today().year
-    if r is None:
-        return f"NPRC-{year}-????"
-    try:
-        v = r.get(f"invoice_counter:{year}")
-        n = int(v) if v else 0
-        return f"NPRC-{year}-{n+1:04d}"
-    except Exception:
-        return f"NPRC-{year}-????"
+    """Random invoice number — NPRC-YYMMDD-XXXX."""
+    today = date.today()
+    yymmdd = today.strftime("%y%m%d")
+    suffix = ''.join(random.choices(string.digits, k=4))
+    return f"NPRC-{yymmdd}-{suffix}"
 
 def save_history(data):
     r = get_redis()
@@ -71,27 +54,15 @@ def get_history(limit=200):
     except Exception:
         return []
 
-def get_counter():
+def clear_history():
     r = get_redis()
-    if r is None:
-        return 0
-    year = date.today().year
-    try:
-        v = r.get(f"invoice_counter:{year}")
-        return int(v) if v else 0
-    except Exception:
-        return 0
-
-def set_counter(val):
-    r = get_redis()
-    if r is None:
-        return False
-    year = date.today().year
-    try:
-        r.set(f"invoice_counter:{year}", val)
-        return True
-    except Exception:
-        return False
+    if r:
+        try:
+            r.delete("invoice_history")
+            return True
+        except Exception:
+            return False
+    return False
 
 # ==================== LOGO ====================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -236,7 +207,6 @@ SVG_DEFS = """
 {% macro icon_arrow_left(size=14) %}<svg width="{{size}}" height="{{size}}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>{% endmacro %}
 {% macro icon_calendar(size=13) %}<svg width="{{size}}" height="{{size}}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>{% endmacro %}
 {% macro icon_trash(size=15) %}<svg width="{{size}}" height="{{size}}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>{% endmacro %}
-{% macro icon_save(size=15) %}<svg width="{{size}}" height="{{size}}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>{% endmacro %}
 {% macro icon_money(size=18) %}<svg width="{{size}}" height="{{size}}" viewBox="0 0 24 24" fill="none" stroke="#00796b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>{% endmacro %}
 """
 
@@ -284,7 +254,26 @@ FORM_HTML = SVG_DEFS + """
     <input name="contact" placeholder="Contact No.">
   </div>
   <label>Diagnosis / Condition</label>
-  <input name="diagnosis" placeholder="e.g. Knee pain, Back pain, Post-surgery rehab">
+  <input name="diagnosis" list="conditions" placeholder="Type or select condition">
+  <datalist id="conditions">
+    <option value="Hemiplegia">
+    <option value="Paraplegia">
+    <option value="Quadriplegia">
+    <option value="Stroke Rehabilitation">
+    <option value="Cerebral Palsy">
+    <option value="Parkinson's Disease">
+    <option value="Bell's Palsy">
+    <option value="Post-Surgery Rehabilitation">
+    <option value="Fracture Rehabilitation">
+    <option value="Knee Pain / Osteoarthritis">
+    <option value="Back Pain / Lumbar Spondylosis">
+    <option value="Neck Pain / Cervical Spondylosis">
+    <option value="Frozen Shoulder">
+    <option value="Sciatica">
+    <option value="Sports Injury">
+    <option value="Geriatric Physiotherapy">
+    <option value="Other">
+  </datalist>
   <label>Referred By (Doctor)</label>
   <input name="referred_by" placeholder="Dr. ...">
 </div>
@@ -378,7 +367,6 @@ PREVIEW_HTML = SVG_DEFS + """
  .confirm{background:#2e7d32;color:#fff}
  .back{background:#eee;color:#333}
  .print-btn{background:#1565c0;color:#fff}
- .badge{display:inline-block;background:#00796b;color:#fff;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600}
  .copy-tag{text-align:right;font-size:11pt;font-weight:700;color:#00796b;margin-bottom:4mm;letter-spacing:.5px}
  .print-header{display:none}
  .print-only{display:none}
@@ -467,9 +455,7 @@ PREVIEW_HTML = SVG_DEFS + """
 
   <div class="warn">
     {{ icon_warning(18) }}
-    <span>Ye sirf preview hai — <b>invoice number abhi generate nahi hua</b>.<br>
-    "Confirm &amp; Download" dabane par milega:
-    <span class="badge">{{ next_no }}</span></span>
+    <span>Ye sirf preview hai — <b>Confirm &amp; Download</b> dabane par invoice number generate hoga aur PDF download hogi.</span>
   </div>
 
   {{ invoice_body() }}
@@ -580,8 +566,6 @@ ADMIN_HTML = SVG_DEFS + """
  h1 svg{flex-shrink:0}
  .slogan{color:#00796b;font-style:italic;font-size:13px;margin:0 0 12px 0;font-weight:500}
  .card{background:#fff;padding:16px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:14px}
- label{display:block;font-size:13px;color:#555;margin-top:10px}
- input{width:100%;padding:9px;border:1px solid #ccc;border-radius:6px;font-size:15px;box-sizing:border-box}
  button{padding:11px 18px;border:0;border-radius:8px;background:#00796b;color:#fff;font-size:15px;cursor:pointer;margin-top:12px;display:inline-flex;align-items:center;gap:6px}
  button svg{flex-shrink:0}
  button.red{background:#c62828}
@@ -593,6 +577,7 @@ ADMIN_HTML = SVG_DEFS + """
  h3 svg{flex-shrink:0}
  .page-footer{text-align:center;color:#888;font-size:12px;margin-top:24px;padding-top:16px;
               border-top:1px solid #d5e5e2;font-style:italic}
+ .info{color:#555;font-size:13px;line-height:1.6}
 </style></head><body>
 <h1>{{ icon_gear(22) }} Admin — NPRC Global</h1>
 <p class="slogan">Care Beyond Clinic Walls</p>
@@ -607,20 +592,18 @@ ADMIN_HTML = SVG_DEFS + """
 {% endif %}
 
 <div class="card">
-  <h3>{{ icon_money(18) }} Invoice Counter ({{ year }})</h3>
-  <p style="color:#666;font-size:14px">Abhi tak ka last number: <b>{{ counter }}</b></p>
-  <p style="color:#666;font-size:13px">Agla invoice: <b>NPRC-{{ year }}-{{ "%04d"|format(counter+1) }}</b></p>
-
-  <form method="post" action="/admin/set_counter">
-    <label>Counter set karein (agle invoice ke liye)</label>
-    <input name="counter" type="number" min="0" value="{{ counter }}" required>
-    <button type="submit">{{ icon_save(15) }} Save</button>
-  </form>
+  <h3>{{ icon_money(18) }} Invoice Numbering</h3>
+  <p class="info">
+    Random invoice numbers use ho rahe hain — format:
+    <b>NPRC-YYMMDD-XXXX</b><br>
+    Example: <code>NPRC-261005-4821</code><br>
+    Har invoice ka number apne aap unique generate hota hai.
+  </p>
 </div>
 
 <div class="card">
   <h3 style="color:#c62828">{{ icon_warning(18) }} Danger Zone</h3>
-  <p style="color:#666;font-size:13px">History delete kar dega. Counter same rahega.</p>
+  <p style="color:#666;font-size:13px">History delete kar dega.</p>
   <form method="post" action="/admin/clear_history"
         onsubmit="return confirm('Pakka history delete karni hai?');">
     <button class="red" type="submit">{{ icon_trash(15) }} Clear Invoice History</button>
@@ -645,32 +628,13 @@ def history():
 @app.route("/admin")
 def admin():
     msg = request.args.get("msg", "")
-    return render_template_string(
-        ADMIN_HTML,
-        counter=get_counter(),
-        year=date.today().year,
-        msg=msg
-    )
-
-@app.route("/admin/set_counter", methods=["POST"])
-def admin_set_counter():
-    try:
-        val = int(request.form.get("counter", 0))
-        if set_counter(val):
-            return redirect(url_for("admin", msg=f"Counter set to {val}"))
-        return redirect(url_for("admin", msg="KV connect nahi hai"))
-    except Exception as e:
-        return redirect(url_for("admin", msg=f"Error: {e}"))
+    return render_template_string(ADMIN_HTML, msg=msg)
 
 @app.route("/admin/clear_history", methods=["POST"])
 def admin_clear_history():
-    r = get_redis()
-    if r:
-        try:
-            r.delete("invoice_history")
-        except Exception as e:
-            return redirect(url_for("admin", msg=f"Error: {e}"))
-    return redirect(url_for("admin", msg="History cleared"))
+    if clear_history():
+        return redirect(url_for("admin", msg="History cleared"))
+    return redirect(url_for("admin", msg="KV connect nahi hai — history clear nahi hui"))
 
 @app.route("/preview", methods=["POST"])
 def preview():
@@ -715,7 +679,6 @@ def preview():
         data=data, items=items,
         subtotal=subtotal, gst=gst, total=total,
         data_json=json.dumps(data),
-        next_no=peek_next_invoice_no(),
         company_name=s["company"],
         company_address=s["address"],
         company_phone=s["phone"],
